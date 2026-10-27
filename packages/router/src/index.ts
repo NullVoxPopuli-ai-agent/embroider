@@ -35,13 +35,26 @@ function embroiderBundles(): {
 }
 
 /**
- * Without the Embroider bundle globals, act like the stock router.
- * Other router extensions, such as ember-engines in a classic build,
- * then keep working.
+ * Embroider sets these globals only for an app with route splitting
+ * or lazy engines.
  */
-function hasBundles(): boolean {
+function assertBundles(): void {
   let bundles = embroiderBundles();
-  return Boolean(bundles._embroiderRouteBundles_ || bundles._embroiderEngineBundles_);
+  if (bundles._embroiderRouteBundles_ || bundles._embroiderEngineBundles_) {
+    return;
+  }
+  throw new Error(
+    [
+      `@embroider/router found no lazy routes and no lazy engines.`,
+      `This router only works in an app that Embroider builds with route splitting.`,
+      ``,
+      `To enable route splitting, add the route names to \`splitAtRoutes\` in ember-cli-build.js:`,
+      ``,
+      `  return compatBuild(app, buildOnce, { splitAtRoutes: ['my-route'] });`,
+      ``,
+      `If you do not want route splitting, import the router from '@ember/routing/router' instead.`,
+    ].join('\n')
+  );
 }
 
 class EmbroiderRouter extends EmberRouter {
@@ -83,11 +96,6 @@ class EmbroiderRouter extends EmberRouter {
   // Unfortunately the stock query parameter behavior pulls on routes just to
   // check what their previous QP values were.
   _getQPMeta(this: this & Internals, handlerInfo: { name: string }, ...rest: unknown[]) {
-    if (!hasBundles()) {
-      // @ts-expect-error extending private method
-      return super._getQPMeta(handlerInfo, ...rest);
-    }
-
     let bundle = this.lazyRoute(handlerInfo.name);
     if (bundle && !this.registeredBundles.get(bundle)?.loaded) {
       // unloaded split routes
@@ -114,10 +122,12 @@ class EmbroiderRouter extends EmberRouter {
   // This is the framework method that we're overriding to provide our own
   // handlerResolver.
   setupRouter(this: this & Internals, ...args: unknown[]) {
+    assertBundles();
+
     // @ts-expect-error extending private method
     let isSetup = super.setupRouter(...args);
     let microLib = this._routerMicrolib;
-    if (hasBundles() && !microLib.getRoute.isEmbroiderRouterHandler) {
+    if (!microLib.getRoute.isEmbroiderRouterHandler) {
       microLib.getRoute = this._handlerResolver(microLib.getRoute.bind(microLib));
     }
     return isSetup;
