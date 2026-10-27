@@ -3,6 +3,7 @@ import { compile } from './js-handlebars';
 import type { Resolver } from './module-resolver';
 import { flatten, partition } from 'lodash';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { extensionsPattern } from '@embroider/shared-internals';
 import walkSync from 'walk-sync';
 import type { V2AddonPackage } from '@embroider/shared-internals/src/package';
@@ -331,6 +332,9 @@ export function getAppFiles(appRoot: string): Set<string> {
 
 export function getFastbootFiles(appRoot: string): Set<string> {
   const appDirPath = join(appRoot, '_fastboot_');
+  if (!existsSync(appDirPath)) {
+    return new Set();
+  }
   const files: string[] = walkSync(appDirPath);
   return new Set(files);
 }
